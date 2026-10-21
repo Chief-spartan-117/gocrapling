@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sagarshrestha/gocrapling/netguard"
 	"io"
 	"math"
 	"math/rand/v2"
@@ -48,6 +49,13 @@ type Options struct {
 	Headers map[string]string
 	// InsecureSkipVerify disables certificate checks.
 	InsecureSkipVerify bool
+	// BlockPrivate refuses loopback, private, link-local and cloud-metadata
+	// addresses and every scheme except http and https. Direct connections
+	// are checked at connect time (so redirects and DNS rebinding are
+	// covered); proxied requests are checked on the initial URL only, because
+	// the proxy resolves later hops. Turn it on whenever URLs come from an
+	// untrusted source, such as an AI agent.
+	BlockPrivate bool
 	// MaxBodyBytes caps the response body. Default 32 MiB.
 	MaxBodyBytes int64
 	// DoH routes DNS lookups for direct (non-proxied) connections through
@@ -172,6 +180,7 @@ func New(opt Options) *Fetcher {
 	f := &Fetcher{opt: opt, clients: map[string]*session{}}
 	if opt.DoH != "" {
 		f.doh = newDoHResolver(opt.DoH)
+		f.doh.guard = opt.BlockPrivate
 	}
 	return f
 }
@@ -230,6 +239,8 @@ func (f *Fetcher) session(proxy string, rotateIdentity bool) (*session, error) {
 	}
 	if proxy != "" {
 		opts = append(opts, tls.WithProxyUrl(proxy))
+	} else if f.opt.BlockPrivate && f.doh == nil {
+		opts = append(opts, tls.WithDialContext(netguard.DialContext))
 	} else if f.doh != nil {
 		// WithDialContext replaces built-in proxy handling, so it is only
 		// used for direct connections.
@@ -254,6 +265,14 @@ func (f *Fetcher) Do(ctx context.Context, req Request) (*Response, error) {
 	target, err := url.Parse(req.URL)
 	if err != nil || target.Host == "" {
 		return nil, fmt.Errorf("fetcher: invalid url %q", req.URL)
+	}
+	if target.Scheme != "http" && target.Scheme != "https" {
+		return nil, fmt.Errorf("fetcher: scheme %q not allowed (http and https only)", target.Scheme)
+	}
+	if f.opt.BlockPrivate {
+		if err := netguard.CheckURL(ctx, req.URL); err != nil {
+			return nil, err
+		}
 	}
 	if len(req.Params) > 0 {
 		q := target.Query()

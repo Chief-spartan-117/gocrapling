@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sagarshrestha/gocrapling/netguard"
 	"io"
 	"net"
 	"net/http"
@@ -25,6 +26,8 @@ const (
 type dohResolver struct {
 	endpoint string
 	hc       *http.Client
+	// guard refuses to connect to non-public addresses.
+	guard bool
 
 	mu    sync.Mutex
 	cache map[string]dohEntry
@@ -142,6 +145,9 @@ func (r *dohResolver) DialContext(ctx context.Context, network, addr string) (ne
 		return nil, err
 	}
 	var d net.Dialer
+	if r.guard {
+		d = *netguard.Dialer()
+	}
 	var last error
 	for _, ip := range ips {
 		c, err := d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
