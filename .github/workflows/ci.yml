@@ -17,3 +17,26 @@ jobs:
       - run: go vet ./...
       # -short skips tests that need Chrome or the public internet.
       - run: go test -race -short -count=1 ./...
+
+  clients:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: go build -o bin/gocrapling ./cmd/gocrapling
+      # Serve a tiny static site and run both clients against a real server.
+      - run: |
+          mkdir site
+          echo '<html><body><main><h1>Hello</h1><a href="/b.html">b</a></main><div style="display:none">IGNORE ME</div></body></html>' > site/index.html
+          echo '<html><body><main><h1>Hello</h1></main></body></html>' > site/b.html
+          (cd site && python3 -m http.server 8771 >/dev/null 2>&1 &)
+          (GOCRAPLING_MCP_TOKEN=cltok bin/gocrapling serve -allow-private >serve.log 2>&1 &)
+          sleep 3
+          export GOCRAPLING_URL=http://127.0.0.1:8080 GOCRAPLING_TOKEN=cltok GOCRAPLING_TARGET=http://127.0.0.1:8771/
+          (cd clients/python && PYTHONPATH=. python3 -m unittest discover -s tests -v)
+          (cd clients/js && npm test)
