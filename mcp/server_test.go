@@ -61,7 +61,7 @@ func TestProtocolAndTools(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	s := New(Options{})
+	s := New(Options{AllowPrivate: true})
 	defer s.Close()
 
 	args := func(m map[string]any) string { b, _ := json.Marshal(m); return string(b) }

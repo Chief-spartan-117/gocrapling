@@ -35,6 +35,11 @@ type Options struct {
 	Browser stealth.Options
 	// Logger receives diagnostics; never write to stdout.
 	Logger *slog.Logger
+	// AllowPrivate lets tools reach loopback, private and link-local
+	// addresses. Off by default: tool arguments come from an AI agent, and
+	// an agent talked into fetching http://169.254.169.254/ would leak cloud
+	// credentials. Only web URLs (http, https) are accepted either way.
+	AllowPrivate bool
 	// StateDir holds saved login files named by the state_file tool
 	// argument. Default: <user cache dir>/gocrapling/state.
 	StateDir string
@@ -64,7 +69,7 @@ func New(opt Options) *Server {
 	if len(opt.Proxies) > 0 {
 		rot = fetcher.NewPoolRotator(opt.Proxies, false)
 	}
-	return &Server{opt: opt, log: opt.Logger, f: fetcher.New(fetcher.Options{Proxies: rot, Profile: "chrome"})}
+	return &Server{opt: opt, log: opt.Logger, f: fetcher.New(fetcher.Options{Proxies: rot, Profile: "chrome", BlockPrivate: !opt.AllowPrivate})}
 }
 
 // Close releases the fetcher and browser.
@@ -85,6 +90,7 @@ func (s *Server) getBrowser() (*stealth.Browser, error) {
 	}
 	o := s.opt.Browser
 	o.SolveChallenge = true
+	o.BlockPrivate = !s.opt.AllowPrivate
 	b, err := stealth.New(o)
 	if err != nil {
 		return nil, err

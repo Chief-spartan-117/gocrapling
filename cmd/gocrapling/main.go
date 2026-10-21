@@ -78,17 +78,18 @@ func (m *multi) String() string     { return strings.Join(*m, ",") }
 func (m *multi) Set(v string) error { *m = append(*m, v); return nil }
 
 type common struct {
-	profile  string
-	proxies  multi
-	timeout  time.Duration
-	retries  int
-	referer  bool
-	stealthy bool
-	headed   bool
-	blockAds bool
-	http3    bool
-	doh      string
-	remote   string
+	profile      string
+	proxies      multi
+	timeout      time.Duration
+	retries      int
+	referer      bool
+	stealthy     bool
+	headed       bool
+	blockAds     bool
+	blockPrivate bool
+	http3        bool
+	doh          string
+	remote       string
 	// browser extras
 	disableResources bool
 	networkIdle      bool
@@ -111,6 +112,7 @@ func (c *common) register(fs *flag.FlagSet) {
 	fs.BoolVar(&c.networkIdle, "network-idle", false, "browser: wait for the network to go quiet after load")
 	fs.StringVar(&c.stateFile, "state-file", "", "browser: load cookies from, and save them to, this file (keeps logins)")
 	fs.BoolVar(&c.solve, "solve-cloudflare", true, "browser: wait out Cloudflare interstitials and click Turnstile")
+	fs.BoolVar(&c.blockPrivate, "block-private", false, "refuse loopback, private and cloud-metadata addresses (use when URLs are untrusted)")
 	fs.BoolVar(&c.blockAds, "block-ads", false, "browser: block ad and tracker hosts")
 }
 
@@ -121,7 +123,7 @@ func (c *common) fetcher() *fetcher.Fetcher {
 	}
 	return fetcher.New(fetcher.Options{
 		Profile: c.profile, Timeout: c.timeout, Retries: c.retries,
-		Proxies: rot, SpoofReferer: c.referer, HTTP3: c.http3, DoH: c.doh,
+		Proxies: rot, SpoofReferer: c.referer, HTTP3: c.http3, DoH: c.doh, BlockPrivate: c.blockPrivate,
 	})
 }
 
@@ -129,7 +131,7 @@ func (c *common) browserOptions() stealth.Options {
 	return stealth.Options{
 		Headed: c.headed, BlockAds: c.blockAds, RemoteURL: c.remote, Timeout: 2 * c.timeout,
 		DisableResources: c.disableResources, NetworkIdle: c.networkIdle, StateFile: c.stateFile,
-		SpoofReferer: c.referer,
+		SpoofReferer: c.referer, BlockPrivate: c.blockPrivate,
 	}
 }
 
@@ -528,6 +530,7 @@ func cmdMCP(ctx context.Context, args []string) error {
 	c.register(fs)
 	httpAddr := fs.String("http", "", "serve MCP over HTTP at this address (POST /mcp) instead of stdio, e.g. 127.0.0.1:8080")
 	token := fs.String("token", os.Getenv("GOCRAPLING_MCP_TOKEN"), "bearer token required for -http (default $GOCRAPLING_MCP_TOKEN)")
+	allowPrivate := fs.Bool("allow-private", false, "let tools reach loopback, private and link-local addresses (off: agents cannot probe internal services or cloud metadata)")
 	stateDir := fs.String("state-dir", "", "directory for saved login states (default: user cache dir)")
 	_ = fs.Parse(args)
 	opt := mcp.Options{Proxies: c.proxies, Logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
@@ -536,6 +539,7 @@ func cmdMCP(ctx context.Context, args []string) error {
 		opt.Browser.Proxy = c.proxies[0]
 	}
 	opt.StateDir = *stateDir
+	opt.AllowPrivate = *allowPrivate
 	srv := mcp.New(opt)
 	defer srv.Close()
 	if *httpAddr != "" {

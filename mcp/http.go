@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -25,6 +27,23 @@ func (s *Server) Handler(token string) http.Handler {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
+		}
+		if token == "" {
+			// No bearer token: the only defence is that the caller is a local
+			// program. Refuse what a web page in the user's browser could send
+			// (cross-origin form posts, DNS-rebinding hostnames).
+			if r.Header.Get("Origin") != "" {
+				http.Error(w, "cross-origin requests are not allowed", http.StatusForbidden)
+				return
+			}
+			if !loopbackHost(r.Host) {
+				http.Error(w, "unexpected Host header", http.StatusForbidden)
+				return
+			}
+		}
+		if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
 		}
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", http.MethodPost)
@@ -66,6 +85,20 @@ func (s *Server) Handler(token string) http.Handler {
 	return mux
 }
 
+// loopbackHost reports whether a Host header names the local machine.
+func loopbackHost(hostport string) bool {
+	h := hostport
+	if hh, _, err := net.SplitHostPort(hostport); err == nil {
+		h = hh
+	}
+	h = strings.Trim(h, "[]")
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
 // dispatch handles one raw message; ok is false for notifications.
 func (s *Server) dispatch(ctx context.Context, raw []byte) (response, bool) {
 	var req request
@@ -90,7 +123,12 @@ func writeRPC(w http.ResponseWriter, v any) {
 
 // ServeHTTP listens on addr until ctx ends.
 func (s *Server) ServeHTTP(ctx context.Context, addr, token string) error {
-	srv := &http.Server{Addr: addr, Handler: s.Handler(token), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{
+		Addr: addr, Handler: s.Handler(token),
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second,
+		IdleTimeout: 2 * time.Minute, MaxHeaderBytes: 64 << 10,
+		// No WriteTimeout: a tool call may legitimately run for minutes.
+	}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
 	select {
