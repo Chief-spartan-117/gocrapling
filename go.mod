@@ -2,6 +2,8 @@ module github.com/sagarshrestha/gocrapling
 
 go 1.27
 
+toolchain go1.27.3
+
 require (
 	github.com/andybalholm/cascadia v1.3.4
 	github.com/antchfx/htmlquery v1.3.7
