@@ -28,6 +28,7 @@ Usage:
   gocrapling fetch [flags] URL      fetch a page, optionally extract with CSS/XPath
   gocrapling crawl [flags] URL...   crawl with a declarative extraction spec
   gocrapling shell                  interactive explorer (get, css, curl, md, ...)
+  gocrapling serve                  REST API (/v1) and MCP over HTTP on 127.0.0.1:8080
   gocrapling mcp                    MCP server on stdio for AI agents
   gocrapling extract [flags] URL FILE  save a page as .md, .txt or .html
   gocrapling install                download a managed Chrome for Testing
@@ -54,6 +55,9 @@ func main() {
 		err = cmdShell(ctx, os.Args[2:])
 	case "mcp":
 		err = cmdMCP(ctx, os.Args[2:])
+	case "serve":
+		// REST API + MCP over HTTP; same as "mcp -http 127.0.0.1:8080".
+		err = cmdMCP(ctx, append([]string{"-http", "127.0.0.1:8080"}, os.Args[2:]...))
 	case "install":
 		err = cmdInstall(ctx, os.Args[2:])
 	case "extract":

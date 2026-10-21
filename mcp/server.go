@@ -311,6 +311,18 @@ func (s *Server) statePath(name string) (string, error) {
 	return filepath.Join(dir, name), nil
 }
 
+// cut shortens text to n characters (default Options.DefaultMaxChars).
+func (s *Server) cut(text string, n int) (string, bool) {
+	if n <= 0 {
+		n = s.opt.DefaultMaxChars
+	}
+	r := []rune(text)
+	if len(r) <= n {
+		return text, false
+	}
+	return string(r[:n]), true
+}
+
 func (s *Server) truncate(text string, n int) string {
 	if n <= 0 {
 		n = s.opt.DefaultMaxChars
@@ -322,23 +334,60 @@ func (s *Server) truncate(text string, n int) string {
 	return string(r[:n]) + fmt.Sprintf("\n\n[truncated: %d of %d characters shown]", n, len(r))
 }
 
-func (s *Server) toolFetch(ctx context.Context, raw json.RawMessage) ([]any, error) {
-	var a struct {
-		URL      string `json:"url"`
-		Mode     string `json:"mode"`
-		CSS      string `json:"css"`
-		XPath    string `json:"xpath"`
-		MainOnly bool   `json:"main_only"`
-		RawHTML  bool   `json:"raw_html"`
-		MaxChars int    `json:"max_chars"`
+// FetchArgs are the inputs of the fetch tool and of POST /v1/fetch.
+type FetchArgs struct {
+	URL      string `json:"url"`
+	Mode     string `json:"mode"`
+	CSS      string `json:"css"`
+	XPath    string `json:"xpath"`
+	MainOnly bool   `json:"main_only"`
+	RawHTML  bool   `json:"raw_html"`
+	MaxChars int    `json:"max_chars"`
 
-		AITargeted   bool            `json:"ai_targeted"`
-		WaitSelector string          `json:"wait_selector"`
-		NetworkIdle  bool            `json:"network_idle"`
-		Actions      json.RawMessage `json:"actions"`
-		StateFile    string          `json:"state_file"`
-	}
+	AITargeted   bool            `json:"ai_targeted"`
+	WaitSelector string          `json:"wait_selector"`
+	NetworkIdle  bool            `json:"network_idle"`
+	Actions      json.RawMessage `json:"actions"`
+	StateFile    string          `json:"state_file"`
+}
+
+// FetchResult is what a fetch produced.
+type FetchResult struct {
+	Status  int    `json:"status"`
+	URL     string `json:"url"`
+	Blocked bool   `json:"blocked"`
+	// Warning carries a non-fatal error, e.g. a block page that survived retries.
+	Warning string `json:"warning,omitempty"`
+	// Content is Markdown, raw HTML, or the matches joined by newlines.
+	Content   string `json:"content"`
+	Truncated bool   `json:"truncated"`
+	// Results lists each match when css or xpath was given.
+	Results []string `json:"results,omitempty"`
+}
+
+func (s *Server) toolFetch(ctx context.Context, raw json.RawMessage) ([]any, error) {
+	var a FetchArgs
 	if err := json.Unmarshal(raw, &a); err != nil || a.URL == "" {
+		return nil, errors.New("url is required")
+	}
+	res, err := s.Fetch(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	header := fmt.Sprintf("HTTP %d %s", res.Status, res.URL)
+	if res.Warning != "" {
+		header += " (" + res.Warning + ")"
+	}
+	body := res.Content
+	if res.Truncated {
+		body += "\n\n[truncated]"
+	}
+	return []any{textContent(header + "\n\n" + body)}, nil
+}
+
+// Fetch downloads and extracts one page.
+func (s *Server) Fetch(ctx context.Context, a FetchArgs) (*FetchResult, error) {
+	if a.URL == "" {
 		return nil, errors.New("url is required")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
@@ -383,9 +432,9 @@ func (s *Server) toolFetch(ctx context.Context, raw json.RawMessage) ([]any, err
 	if resp == nil {
 		return nil, err
 	}
-	header := fmt.Sprintf("HTTP %d %s", resp.Status, resp.URL)
+	out := &FetchResult{Status: resp.Status, URL: resp.URL, Blocked: resp.Blocked}
 	if err != nil {
-		header += " (" + err.Error() + ")"
+		out.Warning = err.Error()
 	}
 
 	var body string
@@ -399,24 +448,45 @@ func (s *Server) toolFetch(ctx context.Context, raw json.RawMessage) ([]any, err
 		}
 		switch {
 		case a.CSS != "":
-			body = strings.Join(doc.Extract(a.CSS), "\n")
-			if a.AITargeted {
-				body = parser.CleanInvisible(body)
-			}
+			out.Results = doc.Extract(a.CSS)
 		case a.XPath != "":
 			sel, xerr := doc.XPath(a.XPath)
 			if xerr != nil {
 				return nil, xerr
 			}
-			body = strings.Join(sel.Texts(), "\n")
-			if a.AITargeted {
-				body = parser.CleanInvisible(body)
-			}
+			out.Results = sel.Texts()
 		default:
 			body = doc.MarkdownWith(parser.MarkdownOptions{MainOnly: a.MainOnly, Safe: a.AITargeted})
 		}
+		if out.Results != nil {
+			if a.AITargeted {
+				for i := range out.Results {
+					out.Results[i] = parser.CleanInvisible(out.Results[i])
+				}
+			}
+			body = strings.Join(out.Results, "\n")
+		}
 	}
-	return []any{textContent(header + "\n\n" + s.truncate(body, a.MaxChars))}, nil
+	out.Content, out.Truncated = s.cut(body, a.MaxChars)
+	return out, nil
+}
+
+// Screenshot renders url in stealth Chrome and returns a full-page PNG.
+func (s *Server) Screenshot(ctx context.Context, url string) ([]byte, error) {
+	if url == "" {
+		return nil, errors.New("url is required")
+	}
+	b, err := s.getBrowser()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	resp, err := b.Fetch(ctx, url, stealth.FetchOptions{Screenshot: true})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Screenshot, nil
 }
 
 func (s *Server) toolScreenshot(ctx context.Context, raw json.RawMessage) ([]any, error) {
@@ -426,26 +496,32 @@ func (s *Server) toolScreenshot(ctx context.Context, raw json.RawMessage) ([]any
 	if err := json.Unmarshal(raw, &a); err != nil || a.URL == "" {
 		return nil, errors.New("url is required")
 	}
-	b, err := s.getBrowser()
+	png, err := s.Screenshot(ctx, a.URL)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	resp, err := b.Fetch(ctx, a.URL, stealth.FetchOptions{Screenshot: true})
-	if err != nil {
-		return nil, err
-	}
-	return []any{map[string]any{"type": "image", "data": base64.StdEncoding.EncodeToString(resp.Screenshot), "mimeType": "image/png"}}, nil
+	return []any{map[string]any{"type": "image", "data": base64.StdEncoding.EncodeToString(png), "mimeType": "image/png"}}, nil
 }
 
-func (s *Server) toolCapture(ctx context.Context, raw json.RawMessage) ([]any, error) {
-	var a struct {
-		URL      string `json:"url"`
-		Regex    string `json:"url_regex"`
-		MaxChars int    `json:"max_chars"`
-	}
-	if err := json.Unmarshal(raw, &a); err != nil || a.URL == "" {
+// CaptureArgs are the inputs of capture_requests and POST /v1/capture.
+type CaptureArgs struct {
+	URL      string `json:"url"`
+	Regex    string `json:"url_regex"`
+	MaxChars int    `json:"max_chars"`
+}
+
+// Captured is one background request a page made.
+type Captured struct {
+	URL      string `json:"url"`
+	Method   string `json:"method"`
+	Status   int    `json:"status"`
+	MimeType string `json:"mime_type"`
+	Body     string `json:"body"`
+}
+
+// Capture loads a page in Chrome and returns the XHR/fetch responses it made.
+func (s *Server) Capture(ctx context.Context, a CaptureArgs) ([]Captured, error) {
+	if a.URL == "" {
 		return nil, errors.New("url is required")
 	}
 	var re *regexp.Regexp
@@ -465,24 +541,51 @@ func (s *Server) toolCapture(ctx context.Context, raw json.RawMessage) ([]any, e
 	if err != nil {
 		return nil, err
 	}
-	var sb strings.Builder
-	fmt.Fprintf(&sb, "%d captured responses\n", len(resp.Captured))
+	out := make([]Captured, 0, len(resp.Captured))
 	for _, c := range resp.Captured {
+		out = append(out, Captured{URL: c.URL, Method: c.Method, Status: c.Status, MimeType: c.MimeType, Body: string(c.Body)})
+	}
+	return out, nil
+}
+
+func (s *Server) toolCapture(ctx context.Context, raw json.RawMessage) ([]any, error) {
+	var a CaptureArgs
+	if err := json.Unmarshal(raw, &a); err != nil || a.URL == "" {
+		return nil, errors.New("url is required")
+	}
+	caps, err := s.Capture(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%d captured responses\n", len(caps))
+	for _, c := range caps {
 		fmt.Fprintf(&sb, "\n# %s %s -> %d %s\n%s\n", c.Method, c.URL, c.Status, c.MimeType, c.Body)
 	}
 	return []any{textContent(s.truncate(sb.String(), a.MaxChars))}, nil
 }
 
-func (s *Server) toolCrawl(ctx context.Context, raw json.RawMessage) ([]any, error) {
-	var a struct {
-		StartURL  string            `json:"start_url"`
-		Fields    map[string]string `json:"fields"`
-		FollowCSS string            `json:"follow_css"`
-		Allow     string            `json:"allow"`
-		MaxPages  int64             `json:"max_pages"`
-		Depth     int               `json:"depth"`
-	}
-	if err := json.Unmarshal(raw, &a); err != nil || a.StartURL == "" || len(a.Fields) == 0 {
+// CrawlArgs are the inputs of the crawl tool and POST /v1/crawl.
+type CrawlArgs struct {
+	StartURL  string            `json:"start_url"`
+	Fields    map[string]string `json:"fields"`
+	FollowCSS string            `json:"follow_css"`
+	Allow     string            `json:"allow"`
+	MaxPages  int64             `json:"max_pages"`
+	Depth     int               `json:"depth"`
+}
+
+// CrawlResult is what a crawl produced. Error is set when it ended early;
+// Items still holds what was scraped until then.
+type CrawlResult struct {
+	Stats string `json:"stats"`
+	Items []any  `json:"items"`
+	Error string `json:"error,omitempty"`
+}
+
+// Crawl runs a small polite crawl (robots.txt obeyed, same host only).
+func (s *Server) Crawl(ctx context.Context, a CrawlArgs) (*CrawlResult, error) {
+	if a.StartURL == "" || len(a.Fields) == 0 {
 		return nil, errors.New("start_url and fields are required")
 	}
 	if a.MaxPages <= 0 {
@@ -529,7 +632,7 @@ func (s *Server) toolCrawl(ctx context.Context, raw json.RawMessage) ([]any, err
 	}
 
 	var mu sync.Mutex
-	var items []any
+	items := []any{}
 	eng, err := spider.NewEngine(spider.Config{
 		HTTP: s.f, Concurrency: 4, PerDomainConcurrency: 2,
 		DownloadDelay: 300 * time.Millisecond, RandomizeDelay: true,
@@ -549,10 +652,26 @@ func (s *Server) toolCrawl(ctx context.Context, raw json.RawMessage) ([]any, err
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	stats, runErr := eng.Run(ctx, sp)
-	b, _ := json.MarshalIndent(map[string]any{"stats": stats.String(), "items": items}, "", "  ")
-	out := s.truncate(string(b), 0)
+	res := &CrawlResult{Stats: stats.String(), Items: items}
 	if runErr != nil {
-		out += "\n(crawl ended early: " + runErr.Error() + ")"
+		res.Error = runErr.Error()
+	}
+	return res, nil
+}
+
+func (s *Server) toolCrawl(ctx context.Context, raw json.RawMessage) ([]any, error) {
+	var a CrawlArgs
+	if err := json.Unmarshal(raw, &a); err != nil || a.StartURL == "" || len(a.Fields) == 0 {
+		return nil, errors.New("start_url and fields are required")
+	}
+	res, err := s.Crawl(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	b, _ := json.MarshalIndent(map[string]any{"stats": res.Stats, "items": res.Items}, "", "  ")
+	out := s.truncate(string(b), 0)
+	if res.Error != "" {
+		out += "\n(crawl ended early: " + res.Error + ")"
 	}
 	return []any{textContent(out)}, nil
 }

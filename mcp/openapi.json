@@ -1,0 +1,141 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "gocrapling API",
+    "version": "0.1.0",
+    "description": "JSON API for fetching and extracting web pages with browser-grade TLS fingerprints or a stealth Chrome. Served by `gocrapling mcp -http ADDR -token T` under /v1, next to the MCP endpoint at /mcp."
+  },
+  "servers": [{ "url": "http://127.0.0.1:8080" }],
+  "security": [{ "bearer": [] }],
+  "paths": {
+    "/v1/fetch": {
+      "post": {
+        "operationId": "fetch",
+        "summary": "Fetch one page and extract from it",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FetchRequest" } } } },
+        "responses": {
+          "200": { "description": "Fetched", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FetchResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/screenshot": {
+      "post": {
+        "operationId": "screenshot",
+        "summary": "Full-page PNG screenshot rendered in stealth Chrome",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["url"], "additionalProperties": false, "properties": { "url": { "type": "string" } } } } } },
+        "responses": {
+          "200": { "description": "PNG, base64 encoded", "content": { "application/json": { "schema": { "type": "object", "properties": { "mime_type": { "type": "string" }, "data": { "type": "string", "format": "byte" } } } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/capture": {
+      "post": {
+        "operationId": "capture",
+        "summary": "Background XHR/fetch responses a page makes (often the JSON API behind a JS app)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CaptureRequest" } } } },
+        "responses": {
+          "200": { "description": "Captured", "content": { "application/json": { "schema": { "type": "object", "properties": { "captured": { "type": "array", "items": { "$ref": "#/components/schemas/Captured" } } } } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/crawl": {
+      "post": {
+        "operationId": "crawl",
+        "summary": "Small polite crawl (robots.txt obeyed, same host only) extracting fields with CSS selectors",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CrawlRequest" } } } },
+        "responses": {
+          "200": { "description": "Items scraped; `error` is set when the crawl ended early", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CrawlResult" } } } },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "502": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/openapi.json": {
+      "get": { "operationId": "openapi", "summary": "This document", "responses": { "200": { "description": "OpenAPI 3 document" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearer": { "type": "http", "scheme": "bearer" } },
+    "responses": {
+      "Unauthorized": { "description": "Missing or wrong bearer token" },
+      "Error": { "description": "Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "error": { "type": "object", "properties": { "code": { "type": "string", "enum": ["invalid_request", "invalid_url", "target_not_allowed", "fetch_failed", "body_too_large", "method_not_allowed"] }, "message": { "type": "string" } } } }
+      },
+      "Step": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string", "enum": ["click", "fill", "press", "wait", "wait_for", "scroll", "evaluate"] },
+          "selector": { "type": "string" }, "text": { "type": "string" }, "key": { "type": "string" },
+          "script": { "type": "string" }, "ms": { "type": "integer" }, "pixels": { "type": "integer" }, "to": { "type": "string" }
+        }
+      },
+      "FetchRequest": {
+        "type": "object",
+        "required": ["url"],
+        "additionalProperties": false,
+        "properties": {
+          "url": { "type": "string", "description": "Absolute http or https URL" },
+          "mode": { "type": "string", "enum": ["http", "browser"], "description": "http (default, fast) or browser (runs JavaScript)" },
+          "css": { "type": "string", "description": "CSS selector; supports ::text and ::attr(name)" },
+          "xpath": { "type": "string" },
+          "main_only": { "type": "boolean", "description": "Markdown of <main>/<article> only" },
+          "raw_html": { "type": "boolean" },
+          "max_chars": { "type": "integer" },
+          "ai_targeted": { "type": "boolean", "description": "Strip hidden elements and invisible characters (prompt-injection defence)" },
+          "wait_selector": { "type": "string", "description": "Browser: wait until this selector exists" },
+          "network_idle": { "type": "boolean" },
+          "actions": { "type": "array", "items": { "$ref": "#/components/schemas/Step" } },
+          "state_file": { "type": "string", "description": "Browser: plain name of a saved login state" }
+        }
+      },
+      "FetchResult": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer" }, "url": { "type": "string" }, "blocked": { "type": "boolean" },
+          "warning": { "type": "string" }, "content": { "type": "string" }, "truncated": { "type": "boolean" },
+          "results": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "CaptureRequest": {
+        "type": "object", "required": ["url"], "additionalProperties": false,
+        "properties": { "url": { "type": "string" }, "url_regex": { "type": "string" }, "max_chars": { "type": "integer" } }
+      },
+      "Captured": {
+        "type": "object",
+        "properties": { "url": { "type": "string" }, "method": { "type": "string" }, "status": { "type": "integer" }, "mime_type": { "type": "string" }, "body": { "type": "string" } }
+      },
+      "CrawlRequest": {
+        "type": "object", "required": ["start_url", "fields"], "additionalProperties": false,
+        "properties": {
+          "start_url": { "type": "string" },
+          "fields": { "type": "object", "additionalProperties": { "type": "string" }, "description": "name to CSS selector" },
+          "follow_css": { "type": "string" }, "allow": { "type": "string", "description": "Regexp links must match" },
+          "max_pages": { "type": "integer", "description": "Default 20, max 200" }, "depth": { "type": "integer", "description": "Default 2" }
+        }
+      },
+      "CrawlResult": {
+        "type": "object",
+        "properties": { "stats": { "type": "string" }, "items": { "type": "array", "items": { "type": "object" } }, "error": { "type": "string" } }
+      }
+    }
+  }
+}

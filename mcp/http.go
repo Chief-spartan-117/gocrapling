@@ -21,31 +21,9 @@ func (s *Server) Handler(token string) http.Handler {
 	// Liveness probe for container health checks. Unauthenticated and
 	// carries no information.
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "ok\n") })
+	mux.Handle("/v1/", s.restHandler(token))
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
-		if token != "" {
-			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") ||
-				subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
-				w.Header().Set("WWW-Authenticate", `Bearer realm="gocrapling"`)
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-		}
-		if token == "" {
-			// No bearer token: the only defence is that the caller is a local
-			// program. Refuse what a web page in the user's browser could send
-			// (cross-origin form posts, DNS-rebinding hostnames).
-			if r.Header.Get("Origin") != "" {
-				http.Error(w, "cross-origin requests are not allowed", http.StatusForbidden)
-				return
-			}
-			if !loopbackHost(r.Host) {
-				http.Error(w, "unexpected Host header", http.StatusForbidden)
-				return
-			}
-		}
-		if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
-			http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		if !authorize(w, r, token, true) {
 			return
 		}
 		if r.Method != http.MethodPost {
@@ -86,6 +64,39 @@ func (s *Server) Handler(token string) http.Handler {
 		writeRPC(w, resp)
 	})
 	return mux
+}
+
+// authorize applies the shared checks for every authenticated endpoint:
+// bearer token (constant time), or, without a token, a local-caller check,
+// and a JSON content type. It writes the error response itself.
+func authorize(w http.ResponseWriter, r *http.Request, token string, needJSON bool) bool {
+	if token != "" {
+		got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") ||
+			subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="gocrapling"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return false
+		}
+	}
+	if token == "" {
+		// No bearer token: the only defence is that the caller is a local
+		// program. Refuse what a web page in the user's browser could send
+		// (cross-origin form posts, DNS-rebinding hostnames).
+		if r.Header.Get("Origin") != "" {
+			http.Error(w, "cross-origin requests are not allowed", http.StatusForbidden)
+			return false
+		}
+		if !loopbackHost(r.Host) {
+			http.Error(w, "unexpected Host header", http.StatusForbidden)
+			return false
+		}
+	}
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); needJSON && mt != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return false
+	}
+	return true
 }
 
 // loopbackHost reports whether a Host header names the local machine.
