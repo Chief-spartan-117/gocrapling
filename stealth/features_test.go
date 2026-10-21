@@ -208,3 +208,12 @@ func TestStepsDriveThePage(t *testing.T) {
 		t.Fatal("unknown type must fail")
 	}
 }
+
+func TestFetchRefusesNonWebSchemes(t *testing.T) {
+	b := newTestBrowser(t, Options{})
+	for _, u := range []string{"file:///etc/hosts", "chrome://version", "javascript:alert(1)", "view-source:https://example.com", "data:text/html,<h1>x</h1>"} {
+		if _, err := b.Fetch(context.Background(), u, FetchOptions{}); err == nil {
+			t.Errorf("Fetch(%q) allowed", u)
+		}
+	}
+}

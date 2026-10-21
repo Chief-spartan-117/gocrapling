@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sagarshrestha/gocrapling/netguard"
 	"math/rand/v2"
 	"net/url"
 	"os"
@@ -55,6 +56,11 @@ type Options struct {
 	Timeout time.Duration
 	// ExtraFlags are raw Chrome flags without leading dashes, e.g. "disable-gpu".
 	ExtraFlags []string
+	// BlockPrivate refuses non-public targets (see netguard). Chrome
+	// resolves and connects itself, so only the URL passed to Fetch is
+	// checked, not redirects or sub-resources. Pair it with a network-level
+	// egress policy when the URLs come from an untrusted source.
+	BlockPrivate bool
 	// BlockAds blocks a built-in list of ad, analytics and tracker hosts.
 	BlockAds bool
 	// BlockDomains blocks extra hosts and their subdomains.
@@ -163,7 +169,9 @@ func New(opt Options) (*Browser, error) {
 	}
 	// Chrome refuses to start its sandbox as root, which is the default
 	// user inside containers.
-	if os.Geteuid() == 0 {
+	// GOCRAPLING_NO_SANDBOX=1 does the same for non-root containers that
+	// cannot create user namespaces (the Docker image sets it).
+	if os.Geteuid() == 0 || os.Getenv("GOCRAPLING_NO_SANDBOX") == "1" {
 		flags = append(flags, chromedp.Flag("no-sandbox", true))
 	}
 	if opt.UserDataDir != "" {
@@ -271,6 +279,17 @@ func (b *Browser) Do(ctx context.Context, req fetcher.Request) (*fetcher.Respons
 
 // Fetch loads a URL in a fresh tab and returns the rendered DOM.
 func (b *Browser) Fetch(ctx context.Context, rawURL string, fo FetchOptions) (*fetcher.Response, error) {
+	// Chrome would happily open file://, chrome:// or javascript: URLs, which
+	// turns a fetch tool into a local file reader. Only web URLs pass.
+	u, perr := url.Parse(rawURL)
+	if perr != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return nil, fmt.Errorf("stealth: %q is not an http or https URL", rawURL)
+	}
+	if b.opt.BlockPrivate {
+		if err := netguard.CheckURL(ctx, rawURL); err != nil {
+			return nil, err
+		}
+	}
 	select {
 	case b.sem <- struct{}{}:
 		defer func() { <-b.sem }()
