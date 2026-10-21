@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -102,7 +103,7 @@ func cell(v any) string {
 	case nil:
 		return ""
 	case string:
-		return x
+		return neutralizeFormula(x)
 	case float64, bool, int, int64:
 		return fmt.Sprint(x)
 	}
@@ -111,4 +112,23 @@ func cell(v any) string {
 		return fmt.Sprint(v)
 	}
 	return string(b)
+}
+
+// neutralizeFormula defuses CSV injection. Scraped text is untrusted: a page
+// can set a price to =HYPERLINK(...) or =cmd|' /C calc'!A0, and Excel or
+// Sheets will run it when someone opens the export. A leading apostrophe
+// makes spreadsheets treat the cell as text. Plain numbers like -5 or +1.5
+// are left alone.
+func neutralizeFormula(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		if _, err := strconv.ParseFloat(s, 64); err == nil {
+			return s
+		}
+		return "'" + s
+	}
+	return s
 }

@@ -151,3 +151,14 @@ func TestContentSpiderWritesMarkdown(t *testing.T) {
 		t.Fatalf("files=%d\n%s", len(found), all)
 	}
 }
+
+func TestCSVFormulaInjectionNeutralized(t *testing.T) {
+	for in, want := range map[string]string{
+		"=HYPERLINK(\"http://x\")": "'=HYPERLINK(\"http://x\")", "+cmd|' /C calc'!A0": "'+cmd|' /C calc'!A0",
+		"@SUM(1)": "'@SUM(1)", "-2+3": "'-2+3", "-5": "-5", "+1.5": "+1.5", "plain": "plain", "": "",
+	} {
+		if got := cell(in); got != want {
+			t.Errorf("cell(%q)=%q want %q", in, got, want)
+		}
+	}
+}

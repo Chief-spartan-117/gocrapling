@@ -25,7 +25,7 @@ type CachingDownloader struct {
 
 // NewCachingDownloader wraps next, caching under dir.
 func NewCachingDownloader(next Downloader, dir string) (*CachingDownloader, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
 	return &CachingDownloader{Next: next, Dir: dir}, nil
@@ -68,7 +68,7 @@ func (c *CachingDownloader) Do(ctx context.Context, r fetcher.Request) (*fetcher
 		Headers: map[string][]string(resp.Headers), Body: resp.Body, Profile: resp.Profile})
 	if merr == nil {
 		tmp := p + ".tmp"
-		if werr := os.WriteFile(tmp, b, 0o644); werr == nil {
+		if werr := os.WriteFile(tmp, b, 0o600); werr == nil {
 			if rerr := os.Rename(tmp, p); rerr != nil {
 				err = errors.Join(err, rerr)
 			}
