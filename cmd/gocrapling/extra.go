@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sagarshrestha/gocrapling/browserinstall"
-	"github.com/sagarshrestha/gocrapling/fetcher"
-	"github.com/sagarshrestha/gocrapling/parser"
-	"github.com/sagarshrestha/gocrapling/stealth"
+	"github.com/Chief-spartan-117/gocrapling/internal/browserinstall"
+	"github.com/Chief-spartan-117/gocrapling/pkg/fetcher"
+	"github.com/Chief-spartan-117/gocrapling/pkg/parser"
+	"github.com/Chief-spartan-117/gocrapling/pkg/stealth"
 )
 
 // pageOpts are the per-page browser options shared by fetch and extract.

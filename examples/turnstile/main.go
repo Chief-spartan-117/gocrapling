@@ -10,7 +10,7 @@ import (
 
 	"github.com/chromedp/chromedp"
 
-	"github.com/sagarshrestha/gocrapling/stealth"
+	"github.com/Chief-spartan-117/gocrapling/pkg/stealth"
 )
 
 func main() {

@@ -11,15 +11,18 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/sagarshrestha/gocrapling/fetcher"
-	"github.com/sagarshrestha/gocrapling/mcp"
-	"github.com/sagarshrestha/gocrapling/parser"
-	"github.com/sagarshrestha/gocrapling/spider"
-	"github.com/sagarshrestha/gocrapling/stealth"
+	"github.com/Chief-spartan-117/gocrapling/internal/mcp"
+	"github.com/Chief-spartan-117/gocrapling/internal/server"
+	"github.com/Chief-spartan-117/gocrapling/internal/service"
+	"github.com/Chief-spartan-117/gocrapling/pkg/fetcher"
+	"github.com/Chief-spartan-117/gocrapling/pkg/parser"
+	"github.com/Chief-spartan-117/gocrapling/pkg/spider"
+	"github.com/Chief-spartan-117/gocrapling/pkg/stealth"
 )
 
 const usage = `gocrapling - undetected scraping toolkit
@@ -32,16 +35,33 @@ Usage:
   gocrapling mcp                    MCP server on stdio for AI agents
   gocrapling extract [flags] URL FILE  save a page as .md, .txt or .html
   gocrapling install                download a managed Chrome for Testing
+  gocrapling version                print the version
   gocrapling fingerprint            show the TLS/HTTP2 fingerprint servers see
 
 Run "gocrapling <command> -h" for flags.
 `
+
+// version is set at release time: -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
+// buildVersion reports the release version, or the module version when
+// installed with "go install", or "dev".
+func buildVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return version
+}
 
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
 	}
+	mcp.Version = buildVersion()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -64,6 +84,8 @@ func main() {
 		err = cmdExtract(ctx, os.Args[2:])
 	case "fingerprint":
 		err = cmdFingerprint(ctx)
+	case "version", "-v", "--version":
+		fmt.Println("gocrapling", buildVersion())
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 	default:
@@ -537,21 +559,23 @@ func cmdMCP(ctx context.Context, args []string) error {
 	allowPrivate := fs.Bool("allow-private", false, "let tools reach loopback, private and link-local addresses (off: agents cannot probe internal services or cloud metadata)")
 	stateDir := fs.String("state-dir", "", "directory for saved login states (default: user cache dir)")
 	_ = fs.Parse(args)
-	opt := mcp.Options{Proxies: c.proxies, Logger: slog.New(slog.NewTextHandler(os.Stderr, nil))}
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	opt := service.Options{Proxies: c.proxies, Logger: log}
 	opt.Browser = c.browserOptions()
 	if len(c.proxies) > 0 {
 		opt.Browser.Proxy = c.proxies[0]
 	}
 	opt.StateDir = *stateDir
 	opt.AllowPrivate = *allowPrivate
-	srv := mcp.New(opt)
-	defer srv.Close()
+	svc := service.New(opt)
+	defer svc.Close()
+	srv := mcp.New(svc, log)
 	if *httpAddr != "" {
 		if *token == "" && !isLoopbackAddr(*httpAddr) {
 			return fmt.Errorf("-http on a non-loopback address needs -token (or $GOCRAPLING_MCP_TOKEN)")
 		}
-		fmt.Fprintf(os.Stderr, "MCP over HTTP on %s/mcp (auth: %v)\n", *httpAddr, *token != "")
-		return srv.ServeHTTP(ctx, *httpAddr, *token)
+		fmt.Fprintf(os.Stderr, "REST API on %[1]s/v1, MCP on %[1]s/mcp (auth: %v)\n", *httpAddr, *token != "")
+		return server.ListenAndServe(ctx, *httpAddr, server.Handler(svc, srv, *token))
 	}
 	// stdout carries the protocol; every log line goes to stderr.
 	err := srv.Serve(ctx, os.Stdin, os.Stdout)

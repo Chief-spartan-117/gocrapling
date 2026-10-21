@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/sagarshrestha/gocrapling/fetcher"
+	"github.com/Chief-spartan-117/gocrapling/pkg/fetcher"
 )
 
 func main() {

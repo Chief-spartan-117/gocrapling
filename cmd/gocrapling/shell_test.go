@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sagarshrestha/gocrapling/fetcher"
-	"github.com/sagarshrestha/gocrapling/stealth"
+	"github.com/Chief-spartan-117/gocrapling/pkg/fetcher"
+	"github.com/Chief-spartan-117/gocrapling/pkg/stealth"
 )
 
 func TestShellSession(t *testing.T) {

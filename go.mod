@@ -1,4 +1,4 @@
-module github.com/sagarshrestha/gocrapling
+module github.com/Chief-spartan-117/gocrapling
 
 go 1.27
 

@@ -5,7 +5,7 @@ description: Scrape web pages without getting blocked using the gocrapling Go to
 
 # gocrapling
 
-Go module `github.com/sagarshrestha/gocrapling`. CLI binary: `gocrapling`.
+Go module `github.com/Chief-spartan-117/gocrapling`. CLI binary: `gocrapling`.
 
 ## Pick the tool
 

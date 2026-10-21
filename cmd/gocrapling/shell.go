@@ -12,9 +12,9 @@ import (
 
 	http "github.com/bogdanfinn/fhttp"
 
-	"github.com/sagarshrestha/gocrapling/fetcher"
-	"github.com/sagarshrestha/gocrapling/parser"
-	"github.com/sagarshrestha/gocrapling/stealth"
+	"github.com/Chief-spartan-117/gocrapling/pkg/fetcher"
+	"github.com/Chief-spartan-117/gocrapling/pkg/parser"
+	"github.com/Chief-spartan-117/gocrapling/pkg/stealth"
 )
 
 const shellHelp = `commands:
