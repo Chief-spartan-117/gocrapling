@@ -4,6 +4,10 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Added
+
+- `docker-compose.yml` for quick deploys (MCP over HTTP with a required token, `cli` profile for one-off commands) and an unauthenticated `/healthz` endpoint for health checks.
+
 ### Security
 
 - **netguard:** new package that refuses non-public addresses; `fetcher.Options.BlockPrivate`, `stealth.Options.BlockPrivate`, CLI `-block-private`. The MCP server enables it by default (`-allow-private` to opt out).

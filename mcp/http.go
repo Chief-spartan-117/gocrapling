@@ -18,6 +18,9 @@ import (
 // request must carry "Authorization: Bearer <token>".
 func (s *Server) Handler(token string) http.Handler {
 	mux := http.NewServeMux()
+	// Liveness probe for container health checks. Unauthenticated and
+	// carries no information.
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "ok\n") })
 	mux.HandleFunc("/mcp", func(w http.ResponseWriter, r *http.Request) {
 		if token != "" {
 			got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")

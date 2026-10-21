@@ -125,3 +125,18 @@ func TestHTTPNoTokenRejectsBrowserOriginsAndForeignHosts(t *testing.T) {
 		t.Fatalf("text/plain: %d", c)
 	}
 }
+
+func TestHealthzNeedsNoAuth(t *testing.T) {
+	s := New(Options{})
+	defer s.Close()
+	ts := httptest.NewServer(s.Handler("sekret"))
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("healthz: %d", resp.StatusCode)
+	}
+}

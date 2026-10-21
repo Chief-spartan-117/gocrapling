@@ -148,6 +148,15 @@ CLI: `gocrapling fetch -markdown -main URL`.
 - **Agent skill:** `skills/gocrapling/SKILL.md`.
 - **Images:** `.github/workflows/docker.yml` builds multi-arch images to GHCR (and Docker Hub if configured) on `v*` tags. Not yet run.
 
+## Quick deploy
+
+```sh
+export GOCRAPLING_MCP_TOKEN=$(openssl rand -hex 32)
+docker compose up -d --build            # MCP over HTTP on 127.0.0.1:8080, bearer auth
+docker compose run --rm cli fetch -markdown https://example.com
+```
+The compose file binds loopback only, drops capabilities, sets `shm_size` for Chrome and keeps saved logins in a volume. Put a TLS reverse proxy in front before exposing it.
+
 ## Security
 
 The MCP server refuses private and metadata addresses and non-web URLs by default; see [`SECURITY.md`](SECURITY.md) for the threat model and limits. Use `-block-private` on `fetch` and `crawl` whenever URLs are untrusted, and `fetcher.Options{BlockPrivate: true}` in library code.
