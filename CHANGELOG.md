@@ -1,24 +1,6 @@
 # Changelog
 
-All notable changes are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
-
-## [Unreleased]
-
-### Added
-
-- REST API under `/v1` (`fetch`, `screenshot`, `capture`, `crawl`, `openapi.json`) served by `gocrapling serve` or `mcp -http`, sharing the MCP server's authentication and SSRF guard; typed `Server.Fetch`, `Screenshot`, `Capture` and `Crawl` methods behind both interfaces.
-- Python client (`clients/python`) and JavaScript/TypeScript client (`clients/js`), both dependency-free, with live tests in CI.
-- `docker-compose.yml` for quick deploys (MCP over HTTP with a required token, `cli` profile for one-off commands) and an unauthenticated `/healthz` endpoint for health checks.
-
-### Security
-
-- **netguard:** new package that refuses non-public addresses; `fetcher.Options.BlockPrivate`, `stealth.Options.BlockPrivate`, CLI `-block-private`. The MCP server enables it by default (`-allow-private` to opt out).
-- **stealth, fetcher:** only `http` and `https` URLs are accepted. Before this, MCP `fetch` with `mode: browser` and `screenshot` could read local files through `file://`.
-- **mcp:** HTTP transport without a token rejects `Origin` headers and non-loopback `Host` values (cross-origin and DNS-rebinding attacks) and requires `Content-Type: application/json`; server read timeouts added.
-- **browserinstall:** download host allow-list, size and entry caps, escaping-symlink rejection.
-- **spider:** CSV cells that start with `= + - @` are neutralised against spreadsheet formula injection; checkpoint, cache and adaptive-signature files are written `0600`.
-- **docker:** image runs as an unprivileged user; Go toolchain pinned to 1.27.3, which fixes ten standard-library advisories reported by `govulncheck`.
-- Add `SECURITY.md` with the threat model and reporting process.
+All notable changes are recorded here. Entries after 0.1.0 are generated from Conventional Commits by release-please; the project uses [Semantic Versioning](https://semver.org/).
 
 ## [0.1.0] - 2026-10-21
 
@@ -41,5 +23,4 @@ First release: a Go port of the ideas in [Scrapling](https://github.com/D4Vinci/
 - No SSRF guard: the fetcher will connect to private addresses. Do not expose `mcp -http` to untrusted callers.
 - Profiles are Chrome 133, Firefox 135 and Safari 16.
 
-[Unreleased]: https://github.com/Chief-spartan-117/gocrapling/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Chief-spartan-117/gocrapling/releases/tag/v0.1.0

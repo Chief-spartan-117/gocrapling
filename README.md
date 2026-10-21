@@ -6,10 +6,10 @@ A Go scraping toolkit modelled on [Scrapling](https://scrapling.readthedocs.io):
 
 | Package | What it does |
 |---|---|
-| `fetcher` | HTTP client with browser-accurate TLS (JA3/JA4), HTTP/2 settings and header order, built on `bogdanfinn/tls-client`. Profile-consistent headers, proxy rotation with cooldown, retries with jittered backoff and `Retry-After`, block detection, optional Google referer. |
-| `stealth` | Chrome via DevTools with automation tells patched (`navigator.webdriver`, plugins, `window.chrome`, WebGL strings, `HeadlessChrome` UA, permissions), proxy auth, human-like mouse movement, interstitial wait. |
-| `parser` | CSS (`::text`, `::attr()`), XPath, text and regex search, `FindSimilar`, and adaptive relocation backed by memory or JSON-file storage. |
-| `spider` | Priority scheduler, de-duplication, per-host concurrency and delay, `robots.txt` (wildcards, `Crawl-delay`), depth limit, offsite filter, JSONL pipeline, checkpoint pause/resume, automatic escalation from HTTP to browser when blocked. |
+| [`pkg/fetcher`](pkg/fetcher) | HTTP client with browser-accurate TLS (JA3/JA4), HTTP/2 settings and header order, built on `bogdanfinn/tls-client`. Profile-consistent headers, proxy rotation with cooldown, retries with jittered backoff and `Retry-After`, block detection, optional Google referer. |
+| [`pkg/stealth`](pkg/stealth) | Chrome via DevTools with automation tells patched (`navigator.webdriver`, plugins, `window.chrome`, WebGL strings, `HeadlessChrome` UA, permissions), proxy auth, human-like mouse movement, interstitial wait. |
+| [`pkg/parser`](pkg/parser) | CSS (`::text`, `::attr()`), XPath, text and regex search, `FindSimilar`, and adaptive relocation backed by memory or JSON-file storage. |
+| [`pkg/spider`](pkg/spider) | Priority scheduler, de-duplication, per-host concurrency and delay, `robots.txt` (wildcards, `Crawl-delay`), depth limit, offsite filter, JSONL pipeline, checkpoint pause/resume, automatic escalation from HTTP to browser when blocked. |
 
 ## CLI
 
@@ -49,7 +49,7 @@ doc.CSSWith(".price", parser.QueryOptions{Adaptive: true, Identifier: "price"})
 ```
 Pass `parser.WithStorage(store)` to `Parse` (`parser.NewFileStorage("sigs.json")`) to persist across runs.
 
-Spiders: see `spider/spider_test.go` for complete examples.
+Spiders: see `pkg/spider/spider_test.go` for complete examples.
 
 ### Output
 
@@ -148,6 +148,20 @@ CLI: `gocrapling fetch -markdown -main URL`.
 - **Agent skill:** `skills/gocrapling/SKILL.md`.
 - **Images:** `.github/workflows/docker.yml` builds multi-arch images to GHCR (and Docker Hub if configured) on `v*` tags. Not yet run.
 
+## Project layout
+
+```
+cmd/gocrapling     CLI (fetch, extract, crawl, shell, serve, mcp, install, version)
+pkg/               public libraries: fetcher, stealth, spider, parser
+internal/          server internals: service, mcp, rest, server, netguard, browserinstall
+api/               OpenAPI contract
+sdk/               Python and JavaScript clients
+examples/          runnable programs and n8n workflows
+docs/              architecture, n8n guide, development notes
+skills/            Claude Code skill
+```
+Details and the rules for extending it: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Contributing and releases: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Quick deploy
 
 ```sh
@@ -160,14 +174,14 @@ The compose file binds loopback only, drops capabilities, sets `shm_size` for Ch
 ## REST API and clients
 
 `gocrapling serve` (same as `mcp -http 127.0.0.1:8080`) exposes a JSON API next to the MCP endpoint:
-`POST /v1/fetch`, `/v1/screenshot`, `/v1/capture`, `/v1/crawl`, and `GET /v1/openapi.json`. It uses the same bearer token, SSRF guard and Chrome as the MCP tools; the spec is [`mcp/openapi.json`](mcp/openapi.json).
+`POST /v1/fetch`, `/v1/screenshot`, `/v1/capture`, `/v1/crawl`, and `GET /v1/openapi.json`. It uses the same bearer token, SSRF guard and Chrome as the MCP tools; the spec is [`api/openapi.json`](api/openapi.json).
 
 | Language | Package | Docs |
 | --- | --- | --- |
-| Python 3.8+ | [`clients/python`](clients/python) (standard library only) | `Client(...).fetch(url, css="h1::text")` |
-| JavaScript / TypeScript, Node 18+ | [`clients/js`](clients/js) (no dependencies, bundled types) | `new Client().fetch(url, { css: "h1::text" })` |
+| Python 3.8+ | [`sdk/python`](sdk/python) (standard library only) | `Client(...).fetch(url, css="h1::text")` |
+| JavaScript / TypeScript, Node 18+ | [`sdk/js`](sdk/js) (no dependencies, bundled types) | `new Client().fetch(url, { css: "h1::text" })` |
 
-Any other language can call the API directly or generate a client from the OpenAPI document. Not yet published to PyPI or npm; install from a checkout.
+Using n8n? No custom node is needed: see [`docs/n8n.md`](docs/n8n.md) and the ready-made workflows in [`examples/n8n`](examples/n8n). Any other language can call the API directly or generate a client from the OpenAPI document. Not yet published to PyPI or npm; install from a checkout.
 
 ## Security
 

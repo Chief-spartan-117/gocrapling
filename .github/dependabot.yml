@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule: { interval: weekly }
+    commit-message: { prefix: "build(deps)" }
+    ignore:
+      # Pinned together with a matching cdproto; v0.21 changed the API.
+      - dependency-name: github.com/chromedp/chromedp
+      - dependency-name: github.com/chromedp/cdproto
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    commit-message: { prefix: "ci" }
+  - package-ecosystem: npm
+    directory: /sdk/js
+    schedule: { interval: monthly }
+    commit-message: { prefix: "build(deps)" }

@@ -12,12 +12,17 @@ go build ./...
 
 The Go version in `go.mod` or newer is needed. Browser features need Chrome: install one, or run `go run ./cmd/gocrapling install` to download Chrome for Testing.
 
+## Project layout
+
+Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) first; it explains the layers. In short: libraries in `pkg/`, server internals in `internal/`, the REST contract in `api/`, clients in `sdk/`. New capabilities go into `internal/service`, then get exposed by `internal/mcp` and `internal/rest`.
+
 ## Before you open a pull request
 
 ```sh
-gofmt -l .                 # must print nothing
-go vet ./...
-go test -race -count=1 ./...
+make lint          # gofmt + go vet
+make test-short    # skips tests that need Chrome or the internet
+make test          # everything (needs Chrome and network)
+make vuln          # govulncheck
 ```
 
 - Tests that need Chrome or the public internet skip with `go test -short ./...`. Run the full suite before a release.
@@ -36,7 +41,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`.
-Scopes: `fetcher`, `stealth`, `parser`, `spider`, `mcp`, `cli`, `browserinstall`, `docker`, `skill`.
+Scopes: `fetcher`, `stealth`, `parser`, `spider`, `service`, `mcp`, `rest`, `server`, `cli`, `api`, `sdk`, `browserinstall`, `docker`, `skill`, `deps`, `n8n`.
 Mark breaking changes with `!` after the scope (`feat(spider)!: ...`) and a `BREAKING CHANGE:` footer.
 
 Examples:
@@ -47,7 +52,21 @@ fix(stealth): measure the Turnstile widget after scrolling settles
 docs: describe MCP over HTTP
 ```
 
-Each pull request should be one logical change. Update `CHANGELOG.md` under `Unreleased` for anything a user can see.
+Each pull request should be one logical change. **The PR title must be a Conventional Commit** (a CI check enforces it) because pull requests are squash-merged and the title becomes the commit message.
+
+Do not edit `CHANGELOG.md` or version numbers by hand; releases generate them.
+
+## Releases (maintainers)
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please):
+
+1. Merging to `main` updates a **release PR** that bumps the version and `CHANGELOG.md` from the commits since the last release. `feat` bumps the minor version, `fix` and `perf` the patch version, and a `!` or `BREAKING CHANGE:` bumps the minor version while we are below 1.0.0 (major after).
+2. Merging that PR creates the tag (`vX.Y.Z`) and the GitHub Release.
+3. The same workflow then attaches binaries for Linux, macOS and Windows (amd64 and arm64, with checksums) and publishes the Docker image to `ghcr.io/chief-spartan-117/gocrapling`.
+
+One-time repository setting: **Settings, Actions, General, "Allow GitHub Actions to create and approve pull requests"**. Without it, add a personal access token as the `RELEASE_PLEASE_TOKEN` secret.
+
+The Python and JavaScript client versions follow the same number automatically; publishing them to PyPI and npm is not automated yet.
 
 ## Reporting problems
 

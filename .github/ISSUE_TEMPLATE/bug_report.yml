@@ -1,0 +1,20 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: "Command or code, the output, and what you expected." }
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes: { label: Version, description: "Output of `gocrapling version`" }
+    validations: { required: true }
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer, if known
+      options: [HTTP fetcher, Stealth browser, Parser, Spider, REST/MCP server, CLI, Docker, Python/JS client]
+  - type: textarea
+    id: env
+    attributes: { label: Environment, description: "OS, architecture, Chrome or Docker, proxy in use (no credentials)." }
