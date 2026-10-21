@@ -1,2 +1,5 @@
 bin/
 *.jsonl
+__pycache__/
+*.egg-info/
+node_modules/
