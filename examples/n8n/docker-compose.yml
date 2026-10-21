@@ -1,0 +1,33 @@
+# n8n + gocrapling on one private network.
+#   export GOCRAPLING_MCP_TOKEN=$(openssl rand -hex 32)
+#   docker compose up -d --build
+#   open http://localhost:5678, create a "Header Auth" credential named "gocrapling"
+#   (name: Authorization, value: Bearer <your token>), then import the workflows
+#   in this folder. In n8n use http://gocrapling:8080 as the base URL.
+services:
+  gocrapling:
+    build: ../..
+    command: ["mcp", "-http", "0.0.0.0:8080"]
+    environment:
+      GOCRAPLING_MCP_TOKEN: ${GOCRAPLING_MCP_TOKEN:?set GOCRAPLING_MCP_TOKEN, e.g. openssl rand -hex 32}
+    expose: ["8080"] # reachable by n8n only, not published to the host
+    shm_size: 1gb
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    mem_limit: 2g
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    ports: ["127.0.0.1:5678:5678"]
+    environment:
+      N8N_HOST: localhost
+      GENERIC_TIMEZONE: UTC
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./:/workflows:ro
+    depends_on: [gocrapling]
+    restart: unless-stopped
+
+volumes:
+  n8n-data:

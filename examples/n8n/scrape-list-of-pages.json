@@ -1,0 +1,136 @@
+{
+  "name": "gocrapling: scrape a list of pages slowly",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "t2",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per URL. Replace with your list (or read a sheet / webhook).\nconst urls = ['https://example.com', 'https://example.org'];\nreturn urls.map(url => ({ json: { url } }));"
+      },
+      "id": "c2",
+      "name": "URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gocrapling:8080/v1/fetch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.url, mode: 'browser', main_only: true, ai_targeted: true }) }}",
+        "options": {
+          "timeout": 300000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 20000
+            }
+          }
+        }
+      },
+      "id": "h2",
+      "name": "gocrapling fetch (browser)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gocrapling-cred",
+          "name": "gocrapling"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "url",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "number"
+            },
+            {
+              "id": "c3",
+              "name": "markdown",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "o2",
+      "name": "Keep the useful fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URLs": {
+      "main": [
+        [
+          {
+            "node": "gocrapling fetch (browser)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gocrapling fetch (browser)": {
+      "main": [
+        [
+          {
+            "node": "Keep the useful fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

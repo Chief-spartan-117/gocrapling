@@ -1,0 +1,146 @@
+{
+  "name": "gocrapling: fetch one page",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "t1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "url",
+              "value": "https://example.com",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "css",
+              "value": "title::text",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s1",
+      "name": "Page to fetch",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gocrapling:8080/v1/fetch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.url, css: $json.css, mode: 'http' }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "h1",
+      "name": "gocrapling fetch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "gocrapling-cred",
+          "name": "gocrapling"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "results",
+              "value": "={{ $json.results }}",
+              "type": "array"
+            },
+            {
+              "id": "b2",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "number"
+            },
+            {
+              "id": "b3",
+              "name": "blocked",
+              "value": "={{ $json.blocked }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "o1",
+      "name": "Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Page to fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page to fetch": {
+      "main": [
+        [
+          {
+            "node": "gocrapling fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gocrapling fetch": {
+      "main": [
+        [
+          {
+            "node": "Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
