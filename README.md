@@ -148,6 +148,10 @@ CLI: `gocrapling fetch -markdown -main URL`.
 - **Agent skill:** `skills/gocrapling/SKILL.md`.
 - **Images:** `.github/workflows/docker.yml` builds multi-arch images to GHCR (and Docker Hub if configured) on `v*` tags. Not yet run.
 
+## Security
+
+The MCP server refuses private and metadata addresses and non-web URLs by default; see [`SECURITY.md`](SECURITY.md) for the threat model and limits. Use `-block-private` on `fetch` and `crawl` whenever URLs are untrusted, and `fetcher.Options{BlockPrivate: true}` in library code.
+
 ## Limits and how to work with them
 
 No tool defeats every protection. Where this one stops, and what to do:

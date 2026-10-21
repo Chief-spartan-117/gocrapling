@@ -4,6 +4,16 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ## [Unreleased]
 
+### Security
+
+- **netguard:** new package that refuses non-public addresses; `fetcher.Options.BlockPrivate`, `stealth.Options.BlockPrivate`, CLI `-block-private`. The MCP server enables it by default (`-allow-private` to opt out).
+- **stealth, fetcher:** only `http` and `https` URLs are accepted. Before this, MCP `fetch` with `mode: browser` and `screenshot` could read local files through `file://`.
+- **mcp:** HTTP transport without a token rejects `Origin` headers and non-loopback `Host` values (cross-origin and DNS-rebinding attacks) and requires `Content-Type: application/json`; server read timeouts added.
+- **browserinstall:** download host allow-list, size and entry caps, escaping-symlink rejection.
+- **spider:** CSV cells that start with `= + - @` are neutralised against spreadsheet formula injection; checkpoint, cache and adaptive-signature files are written `0600`.
+- **docker:** image runs as an unprivileged user; Go toolchain pinned to 1.27.3, which fixes ten standard-library advisories reported by `govulncheck`.
+- Add `SECURITY.md` with the threat model and reporting process.
+
 ## [0.1.0] - 2026-10-21
 
 First release: a Go port of the ideas in [Scrapling](https://github.com/D4Vinci/Scrapling).
