@@ -6,6 +6,8 @@ All notable changes are recorded here. The format follows [Keep a Changelog](htt
 
 ### Added
 
+- REST API under `/v1` (`fetch`, `screenshot`, `capture`, `crawl`, `openapi.json`) served by `gocrapling serve` or `mcp -http`, sharing the MCP server's authentication and SSRF guard; typed `Server.Fetch`, `Screenshot`, `Capture` and `Crawl` methods behind both interfaces.
+- Python client (`clients/python`) and JavaScript/TypeScript client (`clients/js`), both dependency-free, with live tests in CI.
 - `docker-compose.yml` for quick deploys (MCP over HTTP with a required token, `cli` profile for one-off commands) and an unauthenticated `/healthz` endpoint for health checks.
 
 ### Security

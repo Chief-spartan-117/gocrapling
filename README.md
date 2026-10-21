@@ -157,6 +157,18 @@ docker compose run --rm cli fetch -markdown https://example.com
 ```
 The compose file binds loopback only, drops capabilities, sets `shm_size` for Chrome and keeps saved logins in a volume. Put a TLS reverse proxy in front before exposing it.
 
+## REST API and clients
+
+`gocrapling serve` (same as `mcp -http 127.0.0.1:8080`) exposes a JSON API next to the MCP endpoint:
+`POST /v1/fetch`, `/v1/screenshot`, `/v1/capture`, `/v1/crawl`, and `GET /v1/openapi.json`. It uses the same bearer token, SSRF guard and Chrome as the MCP tools; the spec is [`mcp/openapi.json`](mcp/openapi.json).
+
+| Language | Package | Docs |
+| --- | --- | --- |
+| Python 3.8+ | [`clients/python`](clients/python) (standard library only) | `Client(...).fetch(url, css="h1::text")` |
+| JavaScript / TypeScript, Node 18+ | [`clients/js`](clients/js) (no dependencies, bundled types) | `new Client().fetch(url, { css: "h1::text" })` |
+
+Any other language can call the API directly or generate a client from the OpenAPI document. Not yet published to PyPI or npm; install from a checkout.
+
 ## Security
 
 The MCP server refuses private and metadata addresses and non-web URLs by default; see [`SECURITY.md`](SECURITY.md) for the threat model and limits. Use `-block-private` on `fetch` and `crawl` whenever URLs are untrusted, and `fetcher.Options{BlockPrivate: true}` in library code.
