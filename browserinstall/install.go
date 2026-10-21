@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -180,7 +181,36 @@ func resolve(ctx context.Context, plat string) (version, url string, err error) 
 	return "", "", fmt.Errorf("browserinstall: no %s download in manifest", plat)
 }
 
+// Limits guard against a hostile or corrupted archive.
+const (
+	maxDownload  = 1 << 30 // 1 GiB compressed
+	maxExtracted = 3 << 30 // 3 GiB uncompressed
+	maxEntries   = 20000   // files in the archive
+)
+
+// downloadHosts are the only hosts Chrome for Testing is served from.
+var downloadHosts = map[string]bool{
+	"storage.googleapis.com": true,
+	"edgedl.me.gvt1.com":     true,
+}
+
+// checkDownloadURL insists on HTTPS from a known Google host, so a tampered
+// manifest cannot point the installer at an arbitrary server.
+func checkDownloadURL(raw string) error {
+	u, err := neturl.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "https" || !downloadHosts[strings.ToLower(u.Hostname())] {
+		return fmt.Errorf("browserinstall: refusing download from %q", raw)
+	}
+	return nil
+}
+
 func download(ctx context.Context, url, dir string) (string, error) {
+	if err := checkDownloadURL(url); err != nil {
+		return "", err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
@@ -199,7 +229,11 @@ func download(ctx context.Context, url, dir string) (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	n, err := io.Copy(f, io.LimitReader(resp.Body, maxDownload+1))
+	if err == nil && n > maxDownload {
+		err = fmt.Errorf("browserinstall: download exceeds %d bytes", int64(maxDownload))
+	}
+	if err != nil {
 		os.Remove(f.Name())
 		return "", err
 	}
@@ -218,7 +252,15 @@ func extract(src, dest string) error {
 	if err != nil {
 		return err
 	}
+	if len(zr.File) > maxEntries {
+		return fmt.Errorf("browserinstall: archive has %d entries", len(zr.File))
+	}
+	var total uint64
 	for _, f := range zr.File {
+		total += f.UncompressedSize64
+		if total > maxExtracted {
+			return fmt.Errorf("browserinstall: archive expands beyond %d bytes", int64(maxExtracted))
+		}
 		target := filepath.Join(root, f.Name)
 		if target != root && !strings.HasPrefix(target, root+string(os.PathSeparator)) {
 			return fmt.Errorf("browserinstall: unsafe path %q in archive", f.Name)
@@ -241,6 +283,15 @@ func extract(src, dest string) error {
 			}
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
+			}
+			// A link that points outside root would let a later entry
+			// write through it to anywhere on disk.
+			dest := string(link)
+			if !filepath.IsAbs(dest) {
+				dest = filepath.Join(filepath.Dir(target), dest)
+			}
+			if rel, rerr := filepath.Rel(root, filepath.Clean(dest)); rerr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+				return fmt.Errorf("browserinstall: symlink %q escapes the archive", f.Name)
 			}
 			if err := os.Symlink(string(link), target); err != nil {
 				return err

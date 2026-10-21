@@ -69,3 +69,30 @@ func TestResolveLive(t *testing.T) {
 	}
 	t.Logf("stable %s %s", v, url)
 }
+
+func TestCheckDownloadURL(t *testing.T) {
+	for _, bad := range []string{"http://storage.googleapis.com/x.zip", "https://evil.example/chrome.zip", "https://storage.googleapis.com.evil.example/x", "file:///tmp/x.zip"} {
+		if checkDownloadURL(bad) == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+	if err := checkDownloadURL("https://storage.googleapis.com/chrome-for-testing-public/1/mac-arm64/chrome-mac-arm64.zip"); err != nil {
+		t.Errorf("rejected real host: %v", err)
+	}
+}
+
+func TestExtractRejectsEscapingSymlink(t *testing.T) {
+	dir := t.TempDir()
+	zp := filepath.Join(dir, "evil.zip")
+	f, _ := os.Create(zp)
+	zw := zip.NewWriter(f)
+	h := &zip.FileHeader{Name: "link"}
+	h.SetMode(os.ModeSymlink | 0o777)
+	w, _ := zw.CreateHeader(h)
+	w.Write([]byte("../../outside"))
+	zw.Close()
+	f.Close()
+	if err := extract(zp, filepath.Join(dir, "out")); err == nil {
+		t.Fatal("escaping symlink accepted")
+	}
+}
