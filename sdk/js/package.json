@@ -1,14 +1,31 @@
 {
   "name": "gocrapling",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "JavaScript/TypeScript client for the gocrapling scraping server (REST API)",
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",
-  "exports": { ".": { "types": "./index.d.ts", "default": "./index.js" } },
-  "files": ["index.js", "index.d.ts", "README.md"],
-  "engines": { "node": ">=18" },
-  "scripts": { "test": "node --test" },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/Chief-spartan-117/gocrapling.git", "directory": "sdk/js" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chief-spartan-117/gocrapling.git",
+    "directory": "sdk/js"
+  }
 }
