@@ -7,7 +7,7 @@ toolchain go1.27.3
 require (
 	github.com/andybalholm/cascadia v1.3.5
 	github.com/antchfx/htmlquery v1.3.7
-	github.com/bogdanfinn/fhttp v0.7.0
+	github.com/bogdanfinn/fhttp v0.7.1
 	github.com/bogdanfinn/tls-client v1.17.0
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
 	github.com/chromedp/chromedp v0.14.2
