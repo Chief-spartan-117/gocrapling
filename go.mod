@@ -7,8 +7,8 @@ toolchain go1.27.3
 require (
 	github.com/andybalholm/cascadia v1.3.5
 	github.com/antchfx/htmlquery v1.3.7
-	github.com/bogdanfinn/fhttp v0.7.0
-	github.com/bogdanfinn/tls-client v1.17.0
+	github.com/bogdanfinn/fhttp v0.7.1
+	github.com/bogdanfinn/tls-client v1.17.1
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
 	github.com/chromedp/chromedp v0.14.2
 	golang.org/x/net v0.61.0
@@ -19,9 +19,9 @@ require (
 	github.com/antchfx/xpath v1.3.9 // indirect
 	github.com/bdandy/go-errors v1.2.2 // indirect
 	github.com/bdandy/go-socks4 v1.2.3 // indirect
-	github.com/bogdanfinn/quic-go-utls v1.0.11-utls // indirect
+	github.com/bogdanfinn/quic-go-utls v1.0.12-utls // indirect
 	github.com/bogdanfinn/utls v1.8.2-barnius // indirect
-	github.com/bogdanfinn/websocket v1.5.7-barnius // indirect
+	github.com/bogdanfinn/websocket v1.5.8-barnius // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
