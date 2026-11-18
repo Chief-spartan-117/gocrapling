@@ -4,6 +4,11 @@ updates:
     directory: /
     schedule: { interval: weekly }
     commit-message: { prefix: "build(deps)" }
+    # One PR for all minor/patch bumps so they can't conflict in go.mod/go.sum.
+    # Major bumps still get their own PR.
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
     ignore:
       # Pinned together with a matching cdproto; v0.21 changed the API.
       - dependency-name: github.com/chromedp/chromedp
@@ -12,7 +17,13 @@ updates:
     directory: /
     schedule: { interval: weekly }
     commit-message: { prefix: "ci" }
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /sdk/js
     schedule: { interval: monthly }
     commit-message: { prefix: "build(deps)" }
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
