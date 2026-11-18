@@ -2,6 +2,14 @@
 
 All notable changes are recorded here. Entries after 0.1.0 are generated from Conventional Commits by release-please; the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.1](https://github.com/Chief-spartan-117/gocrapling/compare/gocrapling-v0.2.0...gocrapling-v0.2.1) (2026-11-18)
+
+
+### Build
+
+* **deps:** Bump github.com/bogdanfinn/tls-client from 1.17.0 to 1.18.1 ([4014873](https://github.com/Chief-spartan-117/gocrapling/commit/40148732914fee6febbd900b1bd4c6f56c95dc6b))
+* **deps:** Bump github.com/bogdanfinn/tls-client from 1.17.0 to 1.18.1 ([b1cb37b](https://github.com/Chief-spartan-117/gocrapling/commit/b1cb37b75b75c4b37c19694d6facdb32187fb3c4))
+
 ## [0.2.0](https://github.com/Chief-spartan-117/gocrapling/compare/gocrapling-v0.1.0...gocrapling-v0.2.0) (2026-10-21)
 
 
