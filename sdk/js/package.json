@@ -1,6 +1,6 @@
 {
   "name": "gocrapling",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "JavaScript/TypeScript client for the gocrapling scraping server (REST API)",
   "type": "module",
   "main": "./index.js",
